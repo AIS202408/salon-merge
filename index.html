@@ -56,7 +56,7 @@
 
   /* 結果 */
   .results{display:none;margin-top:34px}
-  .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
   @media(max-width:720px){.cards{grid-template-columns:repeat(2,1fr)}}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 12px;text-align:center;box-shadow:var(--shadow)}
   .card .v{font-family:"Shippori Mincho",serif;font-size:25px;font-weight:700;color:var(--gold-deep);line-height:1.2}
@@ -158,7 +158,7 @@
       <button class="tool danger" id="resetBtn">本日分をリセット</button>
     </div>
     <table>
-      <thead><tr><th>予約</th><th>お客様名</th><th>保有ポイント残高</th><th>お誕生月</th><th>区分</th></tr></thead>
+      <thead><tr><th>予約</th><th>お客様名</th><th>保有ポイント残高</th><th>お誕生月</th></tr></thead>
       <tbody id="resBody"></tbody>
     </table>
 
@@ -342,15 +342,11 @@ let lastRows=[];
 function render(rows){
   lastRows=rows;
   const active=rows.filter(r=>!r.cancel);
-  const ex=active.filter(r=>!r.isNew).length;
-  const nw=active.filter(r=>r.isNew).length;
   const gift=active.filter(r=>r.month===CUR_MONTH).length;
   const sumPts=active.reduce((s,r)=>s+toNum(r.points),0);
 
   $('#cards').innerHTML=`
     <div class="card"><div class="v">${active.length}</div><div class="l">本日の来店予定</div></div>
-    <div class="card"><div class="v">${ex}</div><div class="l">既存のお客様</div></div>
-    <div class="card"><div class="v">${nw}</div><div class="l">新規のお客様</div></div>
     <div class="card gift"><div class="v">${gift}🎁</div><div class="l">今月お誕生日</div></div>
     <div class="card"><div class="v">${sumPts.toLocaleString()}</div><div class="l">保有ポイント合計</div></div>`;
 
@@ -358,14 +354,12 @@ function render(rows){
     const isGift=r.month===CUR_MONTH;
     const mcell=r.month?`<span class="mtag">${r.month}月</span>${isGift?'<span class="giftic">🎁</span>':''}`
       :(r.known?'<span class="muted">—</span>':'<span class="muted">未登録</span>');
-    const badge=(r.isNew?'<span class="badge new">新規</span>':'<span class="badge ex">既存</span>')
-      +(r.cancel?'<span class="badge cx">待</span>':'');
+    const waitTag=r.cancel?'<span class="badge cx">待</span>':'';
     return `<tr class="${isGift?'gift':''} ${r.cancel?'cancel':''}">
       <td class="tm">${esc(r.time)}</td>
-      <td class="name">${esc(r.name)}</td>
+      <td class="name">${esc(r.name)}${waitTag}</td>
       <td>${ptsHtml(r.points)}</td>
-      <td>${mcell}</td>
-      <td>${badge}</td></tr>`;
+      <td>${mcell}</td></tr>`;
   }).join('');
 
   const byMonth={}; for(let m=1;m<=12;m++) byMonth[m]=[];
@@ -385,11 +379,11 @@ function esc(s){ return (s??'').toString().replace(/[&<>]/g,c=>({'&':'&amp;','<'
 /* ===== CSV / 印刷 / リセット ===== */
 $('#csvBtn').addEventListener('click',()=>{
   if(!lastRows.length) return;
-  const head=['予約時間','お客様名','保有ポイント残高','お誕生月','今月誕生日','区分','備考'];
+  const head=['予約時間','お客様名','保有ポイント残高','お誕生月','今月誕生日','備考'];
   const body=lastRows.map(r=>[
     r.time, r.name, (r.points===null||r.points==='')?'':toNum(r.points),
     r.month?r.month+'月':(r.known?'':'未登録'),
-    r.month===CUR_MONTH?'★':'', r.isNew?'新規':'既存', r.cancel?'キャンセル待ち':''
+    r.month===CUR_MONTH?'★':'', r.cancel?'キャンセル待ち':''
   ]);
   const csv=[head,...body].map(r=>r.map(c=>`"${(c??'').toString().replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
