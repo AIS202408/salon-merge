@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>本日の来店者マージ｜誕生日 × ポイント</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#faf7f2; --panel:#ffffff; --ink:#2c2620; --ink-soft:#6f655a;
+    --line:#e7ded2; --gold:#b8945f; --gold-deep:#9a7846; --gold-soft:#f3ead9;
+    --rose:#c98a82; --rose-soft:#fbeeec; --green:#7a8a5f; --green-soft:#eef1e6;
+    --shadow:0 1px 2px rgba(44,38,32,.04),0 8px 30px rgba(44,38,32,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Zen Kaku Gothic New",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(circle at 12% 8%,rgba(184,148,95,.05),transparent 38%);}
+  .wrap{max-width:1000px;margin:0 auto;padding:38px 24px 80px}
+  header.top{text-align:center;margin-bottom:30px}
+  .kicker{font-size:12px;letter-spacing:.32em;color:var(--gold-deep);font-weight:700;text-transform:uppercase}
+  h1{font-family:"Shippori Mincho",serif;font-weight:700;font-size:28px;letter-spacing:.04em;margin:8px 0 6px}
+  .sub{color:var(--ink-soft);font-size:14px}
+  .hr-orn{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px;color:var(--gold)}
+  .hr-orn::before,.hr-orn::after{content:"";height:1px;width:54px;background:linear-gradient(90deg,transparent,var(--gold))}
+  .hr-orn::after{background:linear-gradient(90deg,var(--gold),transparent)}
+
+  /* 誕生日マスター（保存・常駐）バー */
+  .master{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 18px;box-shadow:var(--shadow);margin-bottom:18px}
+  .master .mhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .master .mtitle{font-size:13px;font-weight:700;color:var(--gold-deep);letter-spacing:.04em;display:flex;align-items:center;gap:8px}
+  .pill{font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--green-soft);color:var(--green)}
+  .pill.warn{background:var(--rose-soft);color:var(--rose)}
+  .mactions{display:flex;gap:8px}
+  .mdrop{margin-top:12px;border:1.5px dashed var(--line);border-radius:10px;background:#fdfbf7;padding:16px;text-align:center;color:var(--ink-soft);cursor:pointer;font-size:13px;transition:.15s}
+  .mdrop:hover,.mdrop.over{border-color:var(--gold);background:var(--gold-soft)}
+  .mdrop b{color:var(--ink)}
+  .mdrop input{display:none}
+  .mnote{font-size:12px;color:var(--ink-soft);margin-top:8px}
+
+  /* 本日の来店者（毎日） */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:var(--shadow)}
+  .panel h2{font-family:"Shippori Mincho",serif;font-size:18px;font-weight:600;display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .panel .lead{font-size:13px;color:var(--ink-soft);margin-bottom:16px;padding-left:36px}
+  .num{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--gold);color:#fff;font-size:13px;font-weight:700}
+  .drop{border:1.6px dashed var(--line);border-radius:12px;background:#fdfbf7;padding:34px 18px;text-align:center;cursor:pointer;transition:.18s;color:var(--ink-soft)}
+  .drop:hover,.drop.over{border-color:var(--gold);background:var(--gold-soft)}
+  .drop .ic{font-size:34px;display:block;margin-bottom:10px;opacity:.75}
+  .drop .big{color:var(--ink);font-weight:500;font-size:15px}
+  .drop .small{font-size:12px;margin-top:5px}
+  .drop input{display:none}
+  .resstat{margin-top:12px;font-size:13px;display:none;align-items:center;gap:8px;color:var(--green);font-weight:500}
+  .resstat .dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+
+  /* 結果 */
+  .results{display:none;margin-top:34px}
+  .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+  @media(max-width:720px){.cards{grid-template-columns:repeat(2,1fr)}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 12px;text-align:center;box-shadow:var(--shadow)}
+  .card .v{font-family:"Shippori Mincho",serif;font-size:25px;font-weight:700;color:var(--gold-deep);line-height:1.2}
+  .card .l{font-size:11px;color:var(--ink-soft);margin-top:4px}
+  .card.gift{background:linear-gradient(160deg,var(--rose-soft),#fff);border-color:#f0d7d3}
+  .card.gift .v{color:var(--rose)}
+
+  .sec-h{font-family:"Shippori Mincho",serif;font-size:18px;font-weight:600;margin:30px 0 14px;display:flex;align-items:center;gap:10px}
+  .sec-h::after{content:"";flex:1;height:1px;background:var(--line)}
+  .toolbar{display:flex;gap:10px;justify-content:flex-end;margin-bottom:14px;flex-wrap:wrap}
+  button.tool{font-family:"Zen Kaku Gothic New";font-size:13px;font-weight:500;color:var(--gold-deep);background:#fff;border:1px solid var(--gold);border-radius:99px;padding:8px 18px;cursor:pointer;transition:.15s}
+  button.tool:hover{background:var(--gold-soft)}
+  button.tool.danger{color:var(--rose);border-color:#e9c6c1}
+  button.tool.danger:hover{background:var(--rose-soft);border-color:var(--rose)}
+  button.mini{font-family:"Zen Kaku Gothic New";font-size:11px;color:var(--ink-soft);background:transparent;border:1px solid var(--line);border-radius:99px;padding:4px 12px;cursor:pointer}
+  button.mini:hover{border-color:var(--rose);color:var(--rose)}
+
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);font-size:14px}
+  thead th{background:#f6efe4;color:var(--gold-deep);font-weight:700;font-size:12px;letter-spacing:.04em;padding:12px 12px;text-align:left;border-bottom:1px solid var(--line)}
+  tbody td{padding:12px 12px;border-bottom:1px solid #f1ebe1;vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr.gift{background:var(--rose-soft)}
+  tbody tr.gift td:first-child{box-shadow:inset 3px 0 0 var(--rose)}
+  tbody tr.cancel{opacity:.62}
+  .tm{font-variant-numeric:tabular-nums;color:var(--ink-soft);font-size:13px}
+  .name{font-weight:500}
+  .pts{font-variant-numeric:tabular-nums;font-weight:500}
+  .pts .u{font-size:11px;color:var(--ink-soft);font-weight:400;margin-left:2px}
+  .badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px}
+  .badge.ex{background:var(--green-soft);color:var(--green)}
+  .badge.new{background:#eae3f2;color:#7a6a96}
+  .badge.cx{background:#efe9e2;color:var(--ink-soft);margin-left:6px}
+  .mtag{font-weight:600}.giftic{margin-left:6px}.muted{color:#b6aa9a}
+
+  .months{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:720px){.months{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:460px){.months{grid-template-columns:1fr}}
+  .mcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 15px;box-shadow:var(--shadow)}
+  .mcard.cur{border-color:var(--rose);background:linear-gradient(160deg,var(--rose-soft),#fff)}
+  .mcard.empty{opacity:.5}
+  .mcard .mh{font-family:"Shippori Mincho",serif;font-weight:600;font-size:15px;color:var(--gold-deep);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+  .mcard.cur .mh{color:var(--rose)}
+  .mcard .cnt{font-size:11px;color:var(--ink-soft);font-weight:400}
+  .mcard ul{list-style:none;font-size:13px}
+  .mcard li{padding:2px 0;border-bottom:1px dashed #efe7da}.mcard li:last-child{border-bottom:none}
+  .mcard .none{font-size:12px;color:#bdb1a1}
+
+  .note{font-size:12px;color:var(--ink-soft);background:#fdfbf7;border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:8px;padding:12px 14px;margin-top:18px;line-height:1.8}
+  .note b{color:var(--ink)}
+  @media print{body{background:#fff}.master,.panel .drop,.toolbar,.note,.hr-orn{display:none!important}.panel,.card,.mcard,table{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="kicker">Salon Daily Merge</div>
+    <h1>本日の来店者マージ</h1>
+    <p class="sub">来店者リストに、保存済みの誕生日データを合わせてギフト対象を抽出します</p>
+    <div class="hr-orn">✦</div>
+  </header>
+
+  <!-- 誕生日マスター（保存・常駐） -->
+  <div class="master" id="master">
+    <div class="mhead">
+      <div class="mtitle">🎂 誕生日マスター <span class="pill warn" id="mPill">未登録</span></div>
+      <div class="mactions" id="mActions" style="display:none">
+        <button class="mini" id="mReplace">差し替え</button>
+        <button class="mini" id="mDelete">削除</button>
+      </div>
+    </div>
+    <div class="mdrop" id="mDrop">
+      <input type="file" id="mFile" accept=".xlsx,.xls,.csv">
+      <b>お客様名と生年月日の入ったExcel/CSV</b> をドラッグ&ドロップ<br>
+      <span class="mnote">一度入れれば<b>自動で保存</b>され、次回からは読み込み不要です（毎日入れ直す必要はありません）</span>
+    </div>
+  </div>
+
+  <!-- 本日の来店者（毎日インポート） -->
+  <div class="panel">
+    <h2><span class="num">1</span>本日の来店者リスト</h2>
+    <p class="lead">予約システムから出力したExcelをそのままドロップ → 自動でマージします（毎日ここを更新）</p>
+    <div class="drop" id="rDrop">
+      <input type="file" id="rFile" accept=".xlsx,.xls,.csv">
+      <span class="ic">📅</span>
+      <span class="big">本日の来店者リスト（Excel）をドラッグ&ドロップ</span>
+      <span class="small">お客様名・予約時間・ポイントなどを含むファイル（クリックで選択）</span>
+    </div>
+    <div class="resstat" id="rStat"><span class="dot"></span><span id="rMsg"></span></div>
+  </div>
+
+  <!-- 結果 -->
+  <div class="results" id="results">
+    <div class="cards" id="cards"></div>
+
+    <div class="sec-h">マージ結果一覧</div>
+    <div class="toolbar">
+      <button class="tool" id="csvBtn">CSVで保存</button>
+      <button class="tool" id="printBtn">印刷 / PDF</button>
+      <button class="tool danger" id="resetBtn">本日分をリセット</button>
+    </div>
+    <table>
+      <thead><tr><th>予約</th><th>お客様名</th><th>保有ポイント残高</th><th>お誕生月</th><th>区分</th></tr></thead>
+      <tbody id="resBody"></tbody>
+    </table>
+
+    <div class="sec-h">お誕生月別リスト（ギフト準備用）</div>
+    <div class="months" id="months"></div>
+
+    <div class="note">
+      🎁 が<b>今月（<span id="curMonthLbl"></span>）お誕生日</b>の方です。本日ご来店かつ今月誕生日なので、その場でお祝いをお渡しできます。<br>
+      <b>ポイント残高</b>は来店者リストの値をそのまま表示しています。<b>お誕生月</b>は誕生日マスターから引いています（マスターに無い方は「未登録」と表示）。「<b>待</b>」はキャンセル待ちの予約です。
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const CUR_MONTH = new Date().getMonth() + 1;
+$('#curMonthLbl').textContent = CUR_MONTH + '月';
+const norm = s => (s ?? '').toString().replace(/[\s\u3000]+/g,'').trim();
+const safeLS = fn => { try{ return fn(); }catch(e){ return null; } };
+
+/* ===== 共通：誕生月の抽出 ===== */
+function extractMonth(v){
+  if(v==null||v==='') return null;
+  if(v instanceof Date && !isNaN(v)) return v.getMonth()+1;
+  if(typeof v==='number'){ const d=new Date(Math.round((v-25569)*86400*1000)); if(!isNaN(d)) return d.getUTCMonth()+1; }
+  const s=v.toString().trim();
+  let m=s.match(/^\d{4}\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]/); if(m) return clamp(m[1]);
+  m=s.match(/(\d{1,2})\s*月/); if(m) return clamp(m[1]);
+  m=s.match(/^(\d{1,2})\s*[\/\-.]\s*\d{1,2}$/); if(m) return clamp(m[1]);
+  return null;
+}
+const clamp = x => { const n=parseInt(x,10); return (n>=1&&n<=12)?n:null; };
+
+/* ===== Excel読み込み共通：ヘッダー行を自動検出 ===== */
+function readRows(arrbuf){
+  const wb = XLSX.read(arrbuf,{type:'array',cellDates:true});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  fixRange(ws);                       // 出力ファイルの誤った範囲(!ref)を実セルから補正
+  return XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+}
+/* 一部の予約システムは範囲を A1:Q5 等に誤記録するため、実際のセルから範囲を計算し直す */
+function fixRange(ws){
+  const rng={s:{r:Infinity,c:Infinity},e:{r:-1,c:-1}};
+  Object.keys(ws).forEach(k=>{ if(k[0]==='!') return;
+    const c=XLSX.utils.decode_cell(k);
+    if(c.r<rng.s.r)rng.s.r=c.r; if(c.c<rng.s.c)rng.s.c=c.c;
+    if(c.r>rng.e.r)rng.e.r=c.r; if(c.c>rng.e.c)rng.e.c=c.c;
+  });
+  if(rng.e.r>=0){ rng.s.r=0; rng.s.c=0; ws['!ref']=XLSX.utils.encode_range(rng); }
+}
+function findHeader(rows, keys){
+  for(let i=0;i<Math.min(rows.length,12);i++){
+    const r=rows[i]||[];
+    if(r.some(c=>keys.some(k=>(c??'').toString().includes(k)))) return i;
+  }
+  return 0;
+}
+const colIdx = (head,...ks) => head.findIndex(h=>h&&ks.some(k=>h.toString().includes(k)));
+
+/* ============ 誕生日マスター（保存・常駐） ============ */
+const MKEY='salonMerge.birthdayMaster';
+let masterMap={};               // normName -> month
+let masterReady=false;
+
+function parseMaster(rows){
+  const hr=findHeader(rows,['お客様名','氏名','名前','顧客']);
+  const head=rows[hr]||[];
+  let cN=colIdx(head,'お客様名','氏名','名前','顧客');
+  let cB=colIdx(head,'生年月日','誕生','生年','birth');
+  if(cN<0){cN=0;cB=2;}                 // フォールバック（名前,?,生年月日）
+  const map={};
+  for(let i=hr+1;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const nm=r[cN]; if(nm==null||norm(nm)==='') continue;
+    map[norm(nm)] = extractMonth(cB>-1?r[cB]:null);
+  }
+  return map;
+}
+function applyMaster(map, save){
+  masterMap=map; masterReady=true;
+  const cnt=Object.keys(map).length;
+  const known=Object.values(map).filter(Boolean).length;
+  $('#mPill').textContent=`${cnt}名 登録済み`; $('#mPill').classList.remove('warn');
+  $('#mPill').style.background='var(--green-soft)'; $('#mPill').style.color='var(--green)';
+  $('#mDrop').style.display='none'; $('#mActions').style.display='flex';
+  $('#mActions').dataset.info=`誕生月あり ${known}名`;
+  if(save){ safeLS(()=>localStorage.setItem(MKEY,JSON.stringify({savedAt:new Date().toISOString(),map}))); }
+}
+function loadMaster(){
+  const raw=safeLS(()=>localStorage.getItem(MKEY)); if(!raw) return;
+  try{ const p=JSON.parse(raw); if(p&&p.map) applyMaster(p.map,false); }catch(e){}
+}
+function handleMasterFile(file){
+  const fr=new FileReader();
+  fr.onload=e=>{ try{ const map=parseMaster(readRows(e.target.result)); applyMaster(map,true); if(lastRes) doMerge(lastRes); }
+    catch(err){ alert('誕生日マスターの読み込みに失敗しました：'+err.message); } };
+  fr.readAsArrayBuffer(file);
+}
+$('#mReplace').addEventListener('click',()=>$('#mFile').click());
+$('#mDelete').addEventListener('click',()=>{
+  if(!confirm('保存した誕生日マスターを削除します。よろしいですか？')) return;
+  safeLS(()=>localStorage.removeItem(MKEY)); masterMap={}; masterReady=false;
+  $('#mPill').textContent='未登録'; $('#mPill').classList.add('warn');
+  $('#mPill').style.background=''; $('#mPill').style.color='';
+  $('#mDrop').style.display='block'; $('#mActions').style.display='none';
+  if(lastRes) doMerge(lastRes);
+});
+
+/* ============ 本日の来店者リスト（毎日） ============ */
+let lastRes=null;     // 直近の来店者配列（再マージ用）
+
+function parseReservation(rows){
+  const hr=findHeader(rows,['お客様名','氏名','名前']);
+  const head=rows[hr]||[];
+  const cN=colIdx(head,'お客様名','氏名','名前');
+  const cT=colIdx(head,'予約時間','時間');
+  const cP=colIdx(head,'ポイント','保有');
+  const cM=colIdx(head,'会員番号','会員');
+  const cV=colIdx(head,'来店回数','回数');
+  const cS=colIdx(head,'予約スタッフ','スタッフ','状態','ステータス');
+  const list=[];
+  for(let i=hr+1;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const nm=cN>-1?r[cN]:r[0]; if(nm==null||norm(nm)==='') continue;
+    const visits=cV>-1?r[cV]:''; const mem=cM>-1?r[cM]:'';
+    list.push({
+      name:nm.toString().trim(),
+      time:cT>-1?(r[cT]??'').toString().trim():'',
+      points:cP>-1?r[cP]:'',
+      isNew:/新規/.test(String(visits))||!mem||String(mem).trim()==='0',
+      cancel:cS>-1 && /キャンセル|取消/.test(String(r[cS]))
+    });
+  }
+  return list;
+}
+function setupDrop(zoneSel,inputSel,handler){
+  const z=$(zoneSel),inp=$(inputSel);
+  z.addEventListener('click',()=>inp.click());
+  inp.addEventListener('change',e=>{ if(e.target.files[0]){handler(e.target.files[0]); inp.value='';} });
+  ['dragenter','dragover'].forEach(ev=>z.addEventListener(ev,e=>{e.preventDefault();z.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>z.addEventListener(ev,e=>{e.preventDefault();z.classList.remove('over');}));
+  z.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) handler(f); });
+}
+setupDrop('#mDrop','#mFile',handleMasterFile);
+setupDrop('#rDrop','#rFile',file=>{
+  const fr=new FileReader();
+  fr.onload=e=>{
+    try{
+      const list=parseReservation(readRows(e.target.result));
+      if(!list.length){ showRes('お客様名が見つかりませんでした。ファイルをご確認ください。',true); return; }
+      lastRes=list;
+      showRes(`「${file.name}」を読み込みました ／ ${list.length}名`);
+      if(!masterReady){ $('#mPill').classList.add('warn'); }
+      doMerge(list);
+    }catch(err){ showRes('読み込みに失敗しました：'+err.message,true); }
+  };
+  fr.readAsArrayBuffer(file);
+});
+function showRes(msg,err){
+  const s=$('#rStat'); s.style.display='flex';
+  s.querySelector('.dot').style.background=err?'var(--rose)':'var(--green)';
+  s.style.color=err?'var(--rose)':'var(--green)';
+  $('#rMsg').textContent=msg;
+}
+
+/* ============ マージ＆描画 ============ */
+function toNum(p){ if(typeof p==='number') return p; const n=parseInt((p||'').toString().replace(/[^\d-]/g,''),10); return isNaN(n)?0:n; }
+function ptsHtml(p){
+  if(p===null||p==='') return '<span class="muted">—</span>';
+  return `<span class="pts">${toNum(p).toLocaleString()}<span class="u">pt</span></span>`;
+}
+function doMerge(list){
+  const rows=list.map(v=>{
+    const month = masterReady ? (masterMap[norm(v.name)] ?? null) : null;
+    const known = masterReady && Object.prototype.hasOwnProperty.call(masterMap,norm(v.name));
+    return {...v, month, known};
+  });
+  render(rows);
+}
+let lastRows=[];
+function render(rows){
+  lastRows=rows;
+  const active=rows.filter(r=>!r.cancel);
+  const ex=active.filter(r=>!r.isNew).length;
+  const nw=active.filter(r=>r.isNew).length;
+  const gift=active.filter(r=>r.month===CUR_MONTH).length;
+  const sumPts=active.reduce((s,r)=>s+toNum(r.points),0);
+
+  $('#cards').innerHTML=`
+    <div class="card"><div class="v">${active.length}</div><div class="l">本日の来店予定</div></div>
+    <div class="card"><div class="v">${ex}</div><div class="l">既存のお客様</div></div>
+    <div class="card"><div class="v">${nw}</div><div class="l">新規のお客様</div></div>
+    <div class="card gift"><div class="v">${gift}🎁</div><div class="l">今月お誕生日</div></div>
+    <div class="card"><div class="v">${sumPts.toLocaleString()}</div><div class="l">保有ポイント合計</div></div>`;
+
+  $('#resBody').innerHTML=rows.map(r=>{
+    const isGift=r.month===CUR_MONTH;
+    const mcell=r.month?`<span class="mtag">${r.month}月</span>${isGift?'<span class="giftic">🎁</span>':''}`
+      :(r.known?'<span class="muted">—</span>':'<span class="muted">未登録</span>');
+    const badge=(r.isNew?'<span class="badge new">新規</span>':'<span class="badge ex">既存</span>')
+      +(r.cancel?'<span class="badge cx">待</span>':'');
+    return `<tr class="${isGift?'gift':''} ${r.cancel?'cancel':''}">
+      <td class="tm">${esc(r.time)}</td>
+      <td class="name">${esc(r.name)}</td>
+      <td>${ptsHtml(r.points)}</td>
+      <td>${mcell}</td>
+      <td>${badge}</td></tr>`;
+  }).join('');
+
+  const byMonth={}; for(let m=1;m<=12;m++) byMonth[m]=[];
+  rows.forEach(r=>{ if(r.month) byMonth[r.month].push(r.name + (r.cancel?'（待）':'')); });
+  $('#months').innerHTML=Array.from({length:12},(_,i)=>i+1).map(m=>{
+    const arr=byMonth[m], cur=m===CUR_MONTH;
+    const cls='mcard '+(cur?'cur':(arr.length===0?'empty':''));
+    const body=arr.length?`<ul>${arr.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>`:'<div class="none">該当なし</div>';
+    return `<div class="${cls}"><div class="mh"><span>${m}月${cur?' 🎁':''}</span><span class="cnt">${arr.length}名</span></div>${body}</div>`;
+  }).join('');
+
+  $('#results').style.display='block';
+  $('#results').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function esc(s){ return (s??'').toString().replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+/* ===== CSV / 印刷 / リセット ===== */
+$('#csvBtn').addEventListener('click',()=>{
+  if(!lastRows.length) return;
+  const head=['予約時間','お客様名','保有ポイント残高','お誕生月','今月誕生日','区分','備考'];
+  const body=lastRows.map(r=>[
+    r.time, r.name, (r.points===null||r.points==='')?'':toNum(r.points),
+    r.month?r.month+'月':(r.known?'':'未登録'),
+    r.month===CUR_MONTH?'★':'', r.isNew?'新規':'既存', r.cancel?'キャンセル待ち':''
+  ]);
+  const csv=[head,...body].map(r=>r.map(c=>`"${(c??'').toString().replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); const d=new Date();
+  a.href=URL.createObjectURL(blob);
+  a.download=`来店者マージ_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.csv`;
+  a.click();
+});
+$('#printBtn').addEventListener('click',()=>window.print());
+$('#resetBtn').addEventListener('click',()=>{
+  if(!confirm('本日の来店者データと結果をリセットします。\n誕生日マスターは保存されたまま残ります。よろしいですか？')) return;
+  lastRes=null; lastRows=[];
+  $('#results').style.display='none';
+  $('#resBody').innerHTML=''; $('#cards').innerHTML=''; $('#months').innerHTML='';
+  $('#rStat').style.display='none'; $('#rFile').value='';
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
+/* 起動：保存済み誕生日マスターを自動読み込み */
+loadMaster();
+</script>
+</body>
+</html>
